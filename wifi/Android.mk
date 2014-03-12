@@ -25,6 +25,18 @@ ifdef WIFI_DRIVER_FW_PATH_PARAM
 LOCAL_CFLAGS += -DWIFI_DRIVER_FW_PATH_PARAM=\"$(WIFI_DRIVER_FW_PATH_PARAM)\"
 endif
 
+#LOCAL_SRC_FILES += wifi/wifi.c
+#add a new branch for android 4.2's way(gwl)
+ifeq ($(strip $(FORCE_WIFI_WORK_AS_ANDROID4_2)), true)
+LOCAL_SRC_FILES += wifi/wifi_common.c
+LOCAL_SRC_FILES += wifi/wifi_old.c
+LOCAL_SRC_FILES += wifi/wifi_mt5931.c
+else
+ifeq ($(strip $(BOARD_CONNECTIVITY_VENDOR)), RealTek)
+LOCAL_SRC_FILES += ../realtek/wlan/libhardware_legacy/wifi/wifi_realtek.c
+else
 LOCAL_SRC_FILES += wifi/wifi.c
+endif
+endif
 
 LOCAL_SHARED_LIBRARIES += libnetutils

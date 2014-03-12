@@ -236,7 +236,9 @@ protected:
         static const VolumeCurvePoint sSpeakerMediaVolumeCurve[AudioPolicyManagerBase::VOLCNT];
         // volume curve for sonification strategy on speakers
         static const VolumeCurvePoint sSpeakerSonificationVolumeCurve[AudioPolicyManagerBase::VOLCNT];
+        static const VolumeCurvePoint sSpeakerSonificationVolumeCurveDrc[AudioPolicyManagerBase::VOLCNT];
         static const VolumeCurvePoint sDefaultSystemVolumeCurve[AudioPolicyManagerBase::VOLCNT];
+        static const VolumeCurvePoint sDefaultSystemVolumeCurveDrc[AudioPolicyManagerBase::VOLCNT];
         static const VolumeCurvePoint sHeadsetSystemVolumeCurve[AudioPolicyManagerBase::VOLCNT];
         static const VolumeCurvePoint sDefaultVoiceVolumeCurve[AudioPolicyManagerBase::VOLCNT];
         static const VolumeCurvePoint sSpeakerVoiceVolumeCurve[AudioPolicyManagerBase::VOLCNT];
@@ -296,6 +298,7 @@ protected:
             status_t    dump(int fd);
 
             uint32_t mSamplingRate;                     //
+            uint32_t mReqSamplingRate;                  // SamplingRate that app setted
             audio_format_t mFormat;                     // input configuration
             audio_channel_mask_t mChannelMask;             //
             audio_devices_t mDevice;                    // current device this input is routed to
@@ -491,12 +494,15 @@ protected:
 
         audio_io_handle_t selectOutputForEffects(const SortedVector<audio_io_handle_t>& outputs);
 
+        bool isNonOffloadableEffectEnabled();
+
         //
         // Audio policy configuration file parsing (audio_policy.conf)
         //
         static uint32_t stringToEnum(const struct StringToEnum *table,
                                      size_t size,
                                      const char *name);
+        static bool stringToBool(const char *value);
         static audio_output_flags_t parseFlagNames(char *name);
         static audio_devices_t parseDeviceNames(char *name);
         void loadSamplingRates(char *name, IOProfile *profile);
@@ -550,6 +556,10 @@ protected:
         audio_devices_t mAttachedOutputDevices; // output devices always available on the platform
         audio_devices_t mDefaultOutputDevice; // output device selected by default at boot time
                                               // (must be in mAttachedOutputDevices)
+        bool mSpeakerDrcEnabled;// true on devices that use DRC on the DEVICE_CATEGORY_SPEAKER path
+                                // to boost soft sounds, used to adjust volume curves accordingly
+
+        bool isCaptureRateChange;
 
         Vector <HwModule *> mHwModules;
 
