@@ -25,27 +25,38 @@ enum WIFI_CHIP_TYPE_LIST{
     RTL8188CU = 0,
     RTL8192CU,
     RTL8188EU,
-    RT3070,
-    BCM4329,
-    BCM4319,
-    BCM43x9,
     BCM4330,
     RK901,
     RK903,
-    OOB_RK901,
-    OOB_RK903,
-    RT5370,
+    AP6335,
+    AP6234,
+    AP6441,
     MT7601,
     RTL8723AS,
     RTL8723AU,
-    RTL8189ES,
+    RTL8723BS,
+    RTL8723BU,
     RTL8192DU,
     MT6620,
     ESP8089,
     NUM_MAX,
 };
 
+enum {
+    KERNEL_VERSION_3_0_8 = 1,
+    KERNEL_VERSION_3_0_36,
+    KERNEL_VERSION_3_10,
+};
+
 int check_wifi_chip_type(void);
+
+int rk_wifi_power_ctrl(int on);
+
+int rk_wifi_load_driver(int enable);
+
+int check_wireless_ready(void);
+
+int get_kernel_version(void);
 
 /**
  * Load the Wi-Fi driver.
@@ -88,6 +99,26 @@ int wifi_stop_supplicant(int p2pSupported);
  *
  * @return 0 on success, < 0 on failure.
  */
+
+
+ 
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+/**
+ * Start supplicant.
+ *
+ * @return 0 on success, < 0 on failure.
+ */
+int wifi_ap_start_supplicant();
+/**
+ * Stop supplicant.
+ *
+ * @return 0 on success, < 0 on failure.
+ */
+int wifi_ap_stop_supplicant();
+#endif
+ 
+
+
 int wifi_connect_to_supplicant();
 
 /**

@@ -25,7 +25,15 @@ ifdef WIFI_DRIVER_FW_PATH_PARAM
 LOCAL_CFLAGS += -DWIFI_DRIVER_FW_PATH_PARAM=\"$(WIFI_DRIVER_FW_PATH_PARAM)\"
 endif
 
-#LOCAL_SRC_FILES += wifi/wifi.c
+LOCAL_SRC_FILES += wifi/rk_wifi_ctrl.c
+
+ifeq ($(strip $(BOARD_CONNECTIVITY_VENDOR)),Espressif)
+LOCAL_CFLAGS +=-DWIFI_ESP8089
+endif
+ifeq ($(strip $(BOARD_CONNECTIVITY_VENDOR)), MediaTek)
+LOCAL_CFLAGS +=-DWIFI_MTK
+endif
+
 #add a new branch for android 4.2's way(gwl)
 ifeq ($(strip $(FORCE_WIFI_WORK_AS_ANDROID4_2)), true)
 LOCAL_SRC_FILES += wifi/wifi_common.c
@@ -35,8 +43,21 @@ else
 ifeq ($(strip $(BOARD_CONNECTIVITY_VENDOR)), RealTek)
 LOCAL_SRC_FILES += ../realtek/wlan/libhardware_legacy/wifi/wifi_realtek.c
 else
+ifeq ($(strip $(BOARD_CONNECTIVITY_VENDOR)), MediaTek_mt7601)
+LOCAL_SRC_FILES += wifi/wifi_mt7601.c
+else
 LOCAL_SRC_FILES += wifi/wifi.c
 endif
 endif
+endif
+
+ 
+ifeq ($(BOARD_WLAN_DEVICE), mtk)
+LOCAL_CFLAGS += -DMTK_WIFI_VENDOR
+LOCAL_CFLAGS += -DCONFIG_P2P_AUTO_GO_AS_SOFTAP
+LOCAL_CFLAGS += -DCONFIG_MT7601_KO_BUILDIN
+LOCAL_CFLAGS += -DRAL_USB_WIFI_USED
+endif
+ 
 
 LOCAL_SHARED_LIBRARIES += libnetutils

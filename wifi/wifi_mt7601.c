@@ -56,14 +56,48 @@ static char primary_iface[PROPERTY_VALUE_MAX];
 // TODO: use new ANDROID_SOCKET mechanism, once support for multiple
 // sockets is in
 
-#ifndef WIFI_MTK
+// by xiaoyao
+#ifdef CONFIG_MT7601_KO_BUILDIN /*mt7601 buildin ko*/
+
+#else
+#ifdef MTK_WIFI_VENDOR
+    /* mtk 7601  usb wifi */
+    #undef WIFI_DRIVER_MODULE_PATH
+    #define WIFI_DRIVER_MODULE_PATH         "/system/etc/Wireless/RT2870STA/mt7601Usta.ko"
+    #undef WIFI_DRIVER_MODULE_NAME
+    #define WIFI_DRIVER_MODULE_NAME         "mt7601Usta"
+    #undef WIFI_AP_DRIVER_MODULE_PATH
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+	#define WIFI_AP_DRIVER_MODULE_PATH		   "/system/etc/Wireless/RT2870STA/mt7601Usta.ko"
+#else
+    #define WIFI_AP_DRIVER_MODULE_PATH         "/system/etc/Wireless/RT2870AP/mt7601Uap.ko"
+#endif
+    #undef WIFI_AP_DRIVER_MODULE_NAME
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP	
+	#define WIFI_AP_DRIVER_MODULE_NAME		   "mt7601Usta"
+#else
+    #define WIFI_AP_DRIVER_MODULE_NAME         "mt7601Uap"
+#endif	
+#endif
+
+//by esp8089
 #ifndef WIFI_DRIVER_MODULE_PATH
 #define WIFI_DRIVER_MODULE_PATH    "/system/lib/modules/esp8089.ko"
-#endif
 #endif
 #ifndef WIFI_DRIVER_MODULE_NAME
 #define WIFI_DRIVER_MODULE_NAME    "wlan"
 #endif
+
+#undef  WIFI_DRIVER_MODULE_PATH /* cancel defined WIFI_DRIVER_MODULE_PATH , because we use built-in driver*/ 
+
+//by esp8089
+
+
+
+#endif //CONFIG_MT7601_KO_BUILDIN
+// by xiaoyao
+
+
 
 #ifndef WIFI_DRIVER_MODULE_ARG
 #define WIFI_DRIVER_MODULE_ARG          ""
@@ -83,6 +117,18 @@ static char primary_iface[PROPERTY_VALUE_MAX];
 #define WIFI_DRIVER_FW_PATH_P2P		NULL
 #endif
 
+//by xiaoyao
+#ifdef MTK_WIFI_VENDOR
+#undef WIFI_DRIVER_FW_PATH_STA
+#define WIFI_DRIVER_FW_PATH_STA         "STA"
+#undef WIFI_DRIVER_FW_PATH_AP
+#define WIFI_DRIVER_FW_PATH_AP          "AP"
+#undef WIFI_DRIVER_FW_PATH_P2P
+#define WIFI_DRIVER_FW_PATH_P2P         "P2P"
+#endif
+//by xiaoyao
+
+
 #ifndef WIFI_DRIVER_FW_PATH_PARAM
 #define WIFI_DRIVER_FW_PATH_PARAM	"/sys/module/wlan/parameters/fwpath"
 #endif
@@ -96,12 +142,33 @@ static const char DRIVER_MODULE_TAG[]   = WIFI_DRIVER_MODULE_NAME " ";
 static const char DRIVER_MODULE_PATH[]  = WIFI_DRIVER_MODULE_PATH;
 static const char DRIVER_MODULE_ARG[]   = WIFI_DRIVER_MODULE_ARG;
 #endif
+
+//by xiaoyao
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+#ifdef WIFI_AP_DRIVER_MODULE_PATH
+static const char AP_DRIVER_MODULE_NAME[]  = WIFI_AP_DRIVER_MODULE_NAME;
+static const char AP_DRIVER_MODULE_TAG[]   = WIFI_AP_DRIVER_MODULE_NAME " ";
+static const char AP_DRIVER_MODULE_PATH[]  = WIFI_AP_DRIVER_MODULE_PATH;
+//static const char AP_DRIVER_MODULE_ARG[]   = WIFI_AP_DRIVER_MODULE_ARG;
+#endif
+#endif
+//by xiaoyao
+
+
 static const char FIRMWARE_LOADER[]     = WIFI_FIRMWARE_LOADER;
 static const char DRIVER_PROP_NAME[]    = "wlan.driver.status";
 static const char SUPPLICANT_NAME[]     = "wpa_supplicant";
 static const char SUPP_PROP_NAME[]      = "init.svc.wpa_supplicant";
 static const char P2P_SUPPLICANT_NAME[] = "p2p_supplicant";
 static const char P2P_PROP_NAME[]       = "init.svc.p2p_supplicant";
+
+//by xiaoyao
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+static const char AP_DAEMON_NAME[]      = "ap_daemon";
+static const char AP_PROP_NAME[]        = "init.svc.ap_daemon";
+#endif
+//by xiaoyao
+
 static const char BCM_SUPPLICANT_NAME[] = "bcm_supplicant";
 static const char BCM_PROP_NAME[]       = "init.svc.bcm_supplicant";
 static const char SUPP_CONFIG_TEMPLATE[]= "/system/etc/wifi/wpa_supplicant.conf";
@@ -109,6 +176,7 @@ static const char SUPP_CONFIG_FILE[]    = "/data/misc/wifi/wpa_supplicant.conf";
 static const char P2P_CONFIG_FILE[]     = "/data/misc/wifi/p2p_supplicant.conf";
 static const char CONTROL_IFACE_PATH[]  = "/data/misc/wifi/sockets";
 static const char MODULE_FILE[]         = "/proc/modules";
+
 static const char IFNAME[]              = "IFNAME=";
 #define IFNAMELEN			(sizeof(IFNAME) - 1)
 static const char WPA_EVENT_IGNORE[]    = "CTRL-EVENT-IGNORE ";
@@ -123,6 +191,7 @@ static unsigned char dummy_key[21] = { 0x02, 0x11, 0xbe, 0x33, 0x43, 0x35,
 static char supplicant_name[PROPERTY_VALUE_MAX];
 /* Is either SUPP_PROP_NAME or P2P_PROP_NAME */
 static char supplicant_prop_name[PROPERTY_KEY_MAX];
+
 
 static int insmod(const char *filename, const char *args)
 {
@@ -219,23 +288,23 @@ int is_wifi_driver_loaded() {
 #endif
 }
 
+
 int wifi_load_driver()
 {
 #ifdef WIFI_DRIVER_MODULE_PATH
     char driver_status[PROPERTY_VALUE_MAX];
-    int count = 20; /* wait at most 20 seconds for completion */
-    if (check_wireless_ready()) {
+    int count = 100; /* wait at most 20 seconds for completion */
+
+    if (is_wifi_driver_loaded()) {
         return 0;
     }
 
-    //if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
-//#ifndef WIFI_ESP8089
-    if (rk_wifi_load_driver(1) < 0)
-//#else 
-  //  if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
-//#endif
-        return -1;
-
+    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
+    {
+		ALOGE("Driver load failed: %s", DRIVER_MODULE_PATH);
+		return -1;
+    }
+	
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
         /* usleep(WIFI_DRIVER_LOADER_DELAY); */
         property_set(DRIVER_PROP_NAME, "ok");
@@ -243,10 +312,9 @@ int wifi_load_driver()
     else {
         property_set("ctl.start", FIRMWARE_LOADER);
     }
-
+#ifndef WIFI_ESP8089
     sched_yield();
     while (count-- > 0) {
-/*
         if (property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
             if (strcmp(driver_status, "ok") == 0)
                 return 0;
@@ -255,19 +323,25 @@ int wifi_load_driver()
                 return -1;
             }
         }
-*/
-        if (check_wireless_ready()) {
-           property_set(DRIVER_PROP_NAME, "ok");
-           return 0; 
-        }
-        usleep(500000);
+        usleep(200000);
     }
+#else
+    if (check_wireless_ready() == 1) {
+        property_set(DRIVER_PROP_NAME, "ok");
+        return 0;
+    }
+#endif /* check_wireless_ready */
 
     property_set(DRIVER_PROP_NAME, "timeout");
     wifi_unload_driver();
     return -1;
 #else
-    property_set(DRIVER_PROP_NAME, "ok");
+	if (rk_wifi_load_driver(1) < 0)
+	{
+		ALOGD("mt7601 load driver failed !");
+		return -1;
+	}
+	property_set(DRIVER_PROP_NAME, "ok");
     return 0;
 #endif
 }
@@ -276,15 +350,10 @@ int wifi_unload_driver()
 {
     usleep(200000); /* allow to finish interface down */
 #ifdef WIFI_DRIVER_MODULE_PATH
-    //if (rmmod(DRIVER_MODULE_NAME) == 0) {
-//#ifndef WIFI_ESP8089
-    if (rk_wifi_load_driver(0) == 0) {
-//#else
-  //  if (rmmod(DRIVER_MODULE_NAME) == 0) {
-//#endif
+    if (rmmod(DRIVER_MODULE_NAME) == 0) {
         int count = 20; /* wait at most 10 seconds for completion */
         while (count-- > 0) {
-            if (!check_wireless_ready())
+            if (!is_wifi_driver_loaded())
                 break;
             usleep(500000);
         }
@@ -296,6 +365,11 @@ int wifi_unload_driver()
     } else
         return -1;
 #else
+	if (rk_wifi_load_driver(0) != 0)
+	{
+		ALOGD("mt7601 unload driver failed !");
+		return -1;
+	}
     property_set(DRIVER_PROP_NAME, "unloaded");
     return 0;
 #endif
@@ -503,23 +577,33 @@ int wifi_start_supplicant(int p2p_supported)
     const prop_info *pi;
     unsigned serial = 0, i;
 #endif
-    int wifi_type= RTL8188CU;
-    wifi_type = check_wifi_chip_type();
-    if (p2p_supported) {
+
+
+
+//by xiaoyao
+	if (p2p_supported) {
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP	
+        if(p2p_supported == 1) {
+            /* start p2p_supplicant */
+            strcpy(supplicant_name, P2P_SUPPLICANT_NAME);
+            strcpy(supplicant_prop_name, P2P_PROP_NAME);
+        }
+        else {
+            /* start ap daemon */
+            strcpy(supplicant_name, AP_DAEMON_NAME);
+            strcpy(supplicant_prop_name, AP_PROP_NAME);      
+        }
+#else
         if (get_kernel_version() == KERNEL_VERSION_3_10) {
-            
-	  if(wifi_type==ESP8089)
-	    {  
-	      strcpy(supplicant_name, P2P_SUPPLICANT_NAME);
-	      strcpy(supplicant_prop_name, P2P_PROP_NAME);
-	    }else{
-               strcpy(supplicant_name, BCM_SUPPLICANT_NAME);
-               strcpy(supplicant_prop_name, BCM_PROP_NAME);
-	    }
+            strcpy(supplicant_name, BCM_SUPPLICANT_NAME);
+            strcpy(supplicant_prop_name, BCM_PROP_NAME);
         } else {
             strcpy(supplicant_name, P2P_SUPPLICANT_NAME);
             strcpy(supplicant_prop_name, P2P_PROP_NAME);
-	}
+        }
+#endif
+// by xiaoyao
+
         /* Ensure p2p config file is created */
         if (ensure_config_file_exists(P2P_CONFIG_FILE) < 0) {
             ALOGE("Failed to create a p2p config file");
@@ -537,11 +621,23 @@ int wifi_start_supplicant(int p2p_supported)
         return 0;
     }
 
+// by xiaoyao
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+	if (p2p_supported != 2/*AP*/)
+	{
+#endif
+// by xiaoyao
+
     /* Before starting the daemon, make sure its config file exists */
     if (ensure_config_file_exists(SUPP_CONFIG_FILE) < 0) {
         ALOGE("Wi-Fi will not be enabled");
         return -1;
     }
+// by xiaoyao
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+	}
+#endif
+// by xiaoyao
 
     if (ensure_entropy_file_exists() < 0) {
         ALOGE("Wi-Fi entropy file was not created");
@@ -596,27 +692,54 @@ int wifi_start_supplicant(int p2p_supported)
     return -1;
 }
 
+// by xiaoyao
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+int wifi_ap_start_supplicant()
+{
+    int ret = 0;
+    
+    ALOGD("wifi_ap_start_supplicant");
+
+    //Start ap daemon
+    if (wifi_start_supplicant(2) < 0) {
+        ret = -1;
+		ALOGD("wifi_ap_start_supplicant fail\n");
+    }
+    
+    return ret;
+}
+#endif
+// by xiaoyao
+
 int wifi_stop_supplicant(int p2p_supported)
 {
     char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
     int count = 50; /* wait at most 5 seconds for completion */
-    int wifi_type=RTL8188CU;
-    wifi_type= check_wifi_chip_type();
-    if (p2p_supported) {
-        if (get_kernel_version() == KERNEL_VERSION_3_10) {
 
-	   if(wifi_type == ESP8089){
-	      strcpy(supplicant_name, P2P_SUPPLICANT_NAME);
-	      strcpy(supplicant_prop_name, P2P_PROP_NAME);
-	   }else{
-	      strcpy(supplicant_name, BCM_SUPPLICANT_NAME);
-              strcpy(supplicant_prop_name, BCM_PROP_NAME);
-	  }
+	 if (p2p_supported) {
+// by  xiaoyao
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP	
+		if (p2p_supported == 1)
+		{
+			strcpy(supplicant_name, P2P_SUPPLICANT_NAME);
+			strcpy(supplicant_prop_name, P2P_PROP_NAME);
+		}
+		else if (p2p_supported == 2)
+		{
+			strcpy(supplicant_name, AP_DAEMON_NAME);
+			strcpy(supplicant_prop_name, AP_PROP_NAME);
+		}
+#else
+        if (get_kernel_version() == KERNEL_VERSION_3_10) {
+            strcpy(supplicant_name, BCM_SUPPLICANT_NAME);
+            strcpy(supplicant_prop_name, BCM_PROP_NAME);
         } else {
             strcpy(supplicant_name, P2P_SUPPLICANT_NAME);
             strcpy(supplicant_prop_name, P2P_PROP_NAME);
-        
-	}
+        }
+#endif	
+// by  xiaoyao
+
     } else {
         strcpy(supplicant_name, SUPPLICANT_NAME);
         strcpy(supplicant_prop_name, SUPP_PROP_NAME);
@@ -642,6 +765,27 @@ int wifi_stop_supplicant(int p2p_supported)
     return -1;
 }
 
+// by xiaoyao
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+int wifi_ap_stop_supplicant()
+{
+    int ret = 0;
+    char buffer[32];
+    size_t len = 32;
+    char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
+    int count = 50; /* wait at most 5 seconds for completion */    
+    
+    ALOGD("wifi_ap_stop_supplicant");
+    
+    if(wifi_stop_supplicant(2) < 0) {
+        ret = -1;
+    }    
+    
+    return ret;
+}
+#endif
+// by xiaoyao
+
 int wifi_connect_on_socket_path(const char *path)
 {
     char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
@@ -652,6 +796,7 @@ int wifi_connect_on_socket_path(const char *path)
         ALOGE("Supplicant not running, cannot connect");
         return -1;
     }
+
 
     ctrl_conn = wpa_ctrl_open(path);
     if (ctrl_conn == NULL) {
@@ -688,10 +833,24 @@ int wifi_connect_to_supplicant()
     static char path[PATH_MAX];
 
     if (access(IFACE_DIR, F_OK) == 0) {
-        snprintf(path, sizeof(path), "%s/%s", IFACE_DIR, primary_iface);
-    } else {
+        	snprintf(path, sizeof(path), "%s/%s", IFACE_DIR, primary_iface);
+	} else {
+		// by xiaoyao
+	 	#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+		if (strcmp(supplicant_name, AP_DAEMON_NAME) == 0) //for AP
+		{
+			snprintf(path, sizeof(path), "%s/%s", CONTROL_IFACE_PATH, "p2p0");
+			ALOGV("wifi_connect_to_supplicant: Change iface dir.\n");
+		}
+		else
+			snprintf(path, sizeof(path), "@android:wpa_%s", primary_iface);			
+		#else
+
         snprintf(path, sizeof(path), "@android:wpa_%s", primary_iface);
-    }
+		
+		#endif/* by xiaoyao*/
+		
+	}
     return wifi_connect_on_socket_path(path);
 }
 
@@ -702,8 +861,11 @@ int wifi_send_command(const char *cmd, char *reply, size_t *reply_len)
         ALOGV("Not connected to wpa_supplicant - \"%s\" command dropped.\n", cmd);
         return -1;
     }
+	
     ret = wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), reply, reply_len, NULL);
-    if (ret == -2) {
+	ALOGD("'%s' command Send.\n", cmd);
+
+	if (ret == -2) {
         ALOGD("'%s' command timed out.\n", cmd);
         /* unblocks the monitor receive socket for termination */
         TEMP_FAILURE_RETRY(write(exit_sockets[0], "T", 1));
@@ -873,14 +1035,167 @@ const char *wifi_get_fw_path(int fw_type)
     return NULL;
 }
 
+
+// by xiaoyao
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+int is_wifi_ap_driver_loaded() {
+    char driver_status[PROPERTY_VALUE_MAX];
+#ifdef WIFI_AP_DRIVER_MODULE_PATH
+    FILE *proc;
+    char line[sizeof(AP_DRIVER_MODULE_TAG)+10];
+#endif
+
+    if (!property_get(DRIVER_PROP_NAME, driver_status, NULL)
+            || strcmp(driver_status, "ok") != 0) {
+        return 0;  /* driver not loaded */
+    }
+#ifdef WIFI_AP_DRIVER_MODULE_PATH
+    /*
+     * If the property says the driver is loaded, check to
+     * make sure that the property setting isn't just left
+     * over from a previous manual shutdown or a runtime
+     * crash.
+     */
+    if ((proc = fopen(MODULE_FILE, "r")) == NULL) {
+        ALOGW("Could not open %s: %s", MODULE_FILE, strerror(errno));
+        property_set(DRIVER_PROP_NAME, "unloaded");
+        return 0;
+    }
+    while ((fgets(line, sizeof(line), proc)) != NULL) {
+        if (strncmp(line, AP_DRIVER_MODULE_TAG, strlen(AP_DRIVER_MODULE_TAG)) == 0) {
+            fclose(proc);
+            return 1;
+        }
+    }
+    fclose(proc);
+    property_set(DRIVER_PROP_NAME, "unloaded");
+    return 0;
+#else
+    return 1;
+#endif
+}
+
+static int ap_boot = 0;
+int wifi_load_ap_driver()
+{
+#ifdef WIFI_AP_DRIVER_MODULE_PATH
+    char driver_status[PROPERTY_VALUE_MAX];
+    char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
+    int count = 100; /* wait at most 20 seconds for completion */
+
+    if (property_get(SUPP_PROP_NAME, supp_status, NULL)
+            && strcmp(supp_status, "stopping") == 0) {
+        ALOGD("supplicant status is stopping, try to stop supplicant...");    	
+        wifi_stop_supplicant(1);// wifi on/off test will lead to unblocking problem
+        property_get(SUPP_PROP_NAME, supp_status, NULL);
+        ALOGD("supplicant status = %s", supp_status);    	
+    } 
+
+    if (is_wifi_ap_driver_loaded()) {
+        return 0;
+    }
+    
+	ALOGE("begin to insmod %s %s firmware!", AP_DRIVER_MODULE_PATH, "");
+    if (insmod(AP_DRIVER_MODULE_PATH, "") < 0) {
+        ALOGE("insmod %s %s firmware failed!", AP_DRIVER_MODULE_PATH, "");
+        rmmod(AP_DRIVER_MODULE_NAME);//it may be load driver already,try remove it.
+        return -1;
+    }
+
+	if (strcmp(FIRMWARE_LOADER,"") == 0) {
+		property_set(DRIVER_PROP_NAME, "ok");
+    }
+    else {
+        property_set("ctl.start", FIRMWARE_LOADER);
+    }
+
+    sched_yield();
+    while (count-- > 0) {
+        if (property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
+            if (strcmp(driver_status, "ok") == 0)
+                return 0;
+            else if (strcmp(DRIVER_PROP_NAME, "failed") == 0) {
+                wifi_unload_driver();
+                return -1;
+            }
+        }
+        usleep(200000);
+    }
+    property_set(DRIVER_PROP_NAME, "timeout");
+    wifi_unload_driver();
+    return -1;
+#else
+	
+  
+    if(0 == ap_boot)
+    {
+	ALOGD("enter load ap!");
+	system("cp /etc/firmware/RT2870AP.dat /data/misc/wifi/ &");
+	system("cp /etc/firmware/RT2870APCard.dat /data/misc/wifi/ &");
+	ap_boot += 1;
+    }
+   
+    property_set(DRIVER_PROP_NAME, "ok");
+    return 0;
+#endif
+}
+
+int wifi_unload_ap_driver()
+{
+	ALOGD("wifi unload driver.\n");
+    usleep(200000); /* allow to finish interface down */
+#ifdef WIFI_AP_DRIVER_MODULE_PATH
+    if (rmmod(AP_DRIVER_MODULE_NAME) == 0) 
+	{    	
+        int count = 20; /* wait at most 10 seconds for completion */
+        while (count-- > 0) {
+            if (!is_wifi_ap_driver_loaded())
+                break;
+            usleep(500000);
+        }
+        usleep(500000); /* allow card removal */
+        if (count) {
+            return 0;
+        }
+        return -1;
+    } else
+        return -1;
+#else
+    property_set(DRIVER_PROP_NAME, "unloaded");
+    return 0;
+#endif
+}
+#endif
+// by xiaoyao
+
 int wifi_change_fw_path(const char *fwpath)
 {
     int len;
     int fd;
     int ret = 0;
 
-    if (!fwpath)
-        return ret;
+#ifdef CONFIG_MT7601_KO_BUILDIN
+	// by xiaoyao
+	ALOGD("Eneter: %s, fwpath = %s.\n", __FUNCTION__, fwpath);
+	
+	if(!strcmp(fwpath,"AP")){
+		if(0 == ap_boot)
+    		{
+        		ALOGD("MT7601: enter load ap fw!");
+        		system("cp /etc/firmware/RT2870AP.dat /data/misc/wifi/ &");
+        		system("cp /etc/firmware/RT2870APCard.dat /data/misc/wifi/ &");
+        		ap_boot += 1;
+    		}
+	}
+#endif /* CONFIG_MT7601_KO_BUILDIN */
+
+	if (!fwpath)
+        	return ret;
+	
+
+#ifndef CONFIG_MT7601_KO_BUILDIN
+//by xiaoyao
+	
     fd = TEMP_FAILURE_RETRY(open(WIFI_DRIVER_FW_PATH_PARAM, O_WRONLY));
     if (fd < 0) {
         ALOGE("Failed to open wlan fw path param (%s)", strerror(errno));
@@ -892,5 +1207,6 @@ int wifi_change_fw_path(const char *fwpath)
         ret = -1;
     }
     close(fd);
+#endif
     return ret;
 }
